@@ -125,6 +125,8 @@ func handleMessages(c *Client) {
 		}
 		if msg.Type == "MOVEMENT" {
 			paddleMovement(msg.PlayerId, msg.PlayerRole, msg.Direction)
+		} else if msg.Type == "RESTART_GAME" {
+			Restart_Game()
 		}
 	}
 }
