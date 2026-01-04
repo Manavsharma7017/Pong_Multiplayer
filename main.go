@@ -188,6 +188,7 @@ func manager() {
 			clientsMu.Lock()
 			if len(clients) >= MAX_PLAYERS {
 				clientsMu.Unlock()
+				broadcastToAll([]byte("server full, connection rejected"))
 				client.conn.Close()
 				continue
 			}
@@ -214,9 +215,18 @@ func manager() {
 		case client := <-removeClient:
 			clientsMu.Lock()
 			delete(clients, client.id)
+			count := len(clients)
 			clientsMu.Unlock()
+			if len(clients) != 2 {
+				stopCurrentGame()
+			}
+			// 🔥 CRITICAL FIX
 
 			broadcastToAll([]byte("player disconnected"))
+
+			if count == 1 {
+				broadcastToAll([]byte("waiting for opponent"))
+			}
 
 		case msg := <-broadcast:
 			broadcastToAll(msg)
@@ -324,6 +334,10 @@ func Mainlogic(state *Gamestate, stop <-chan struct{}) {
 
 		case <-ticker.C:
 			gameMu.Lock()
+			if state == nil {
+				gameMu.Unlock()
+				return
+			}
 			updateball(&state.Ball)
 			collisionwithwall(state)
 			collisionwithpaddle(state)
@@ -355,16 +369,28 @@ func broadcastGame(state *Gamestate) {
 func Restart_Game() {
 	startGame()
 }
-func startGame() {
-	// stop previous game safely
+func stopCurrentGame() {
+	gameMu.Lock()
+	defer gameMu.Unlock()
+
 	if stopGame != nil {
-		select {
-		case <-stopGame:
-			// already closed
-		default:
-			close(stopGame)
-		}
+		close(stopGame)
+		stopGame = nil
 	}
+
+	game = nil
+}
+
+func startGame() {
+	clientsMu.Lock()
+	if len(clients) != 2 {
+		clientsMu.Unlock()
+		return
+	}
+	clientsMu.Unlock()
+
+	// always reset cleanly
+	stopCurrentGame()
 
 	stopGame = make(chan struct{})
 
