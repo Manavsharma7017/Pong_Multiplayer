@@ -18,7 +18,7 @@ const GAME_HEIGHT = 500
 const PADDLE_WIDTH = 25
 const PADDLE_HEIGHT = 100
 const BALL_RADIUS = 12
-const PADDLE_SPEED = 50
+const PADDLE_SPEED = 2
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
@@ -49,6 +49,7 @@ type Paddlemovement struct {
 	Role   string `json:"role"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
+	Dy     int    `json:"dy"`
 	Id     string `json:"id"`
 }
 
@@ -147,19 +148,14 @@ func paddleMovement(playerID, role, direction string) {
 		}
 
 		if direction == "up" {
-			game.Paddle1.Y -= PADDLE_SPEED
+
+			game.Paddle1.Dy = -1
 		}
 		if direction == "down" {
-			game.Paddle1.Y += PADDLE_SPEED
+			game.Paddle1.Dy = 1
 		}
 
 		// clamp
-		if game.Paddle1.Y < 0 {
-			game.Paddle1.Y = 0
-		}
-		if game.Paddle1.Y > GAME_HEIGHT-game.Paddle1.Height {
-			game.Paddle1.Y = GAME_HEIGHT - game.Paddle1.Height
-		}
 
 	case "player2":
 		if game.Paddle2.Id != playerID {
@@ -167,18 +163,12 @@ func paddleMovement(playerID, role, direction string) {
 		}
 
 		if direction == "up" {
-			game.Paddle2.Y -= PADDLE_SPEED
+			game.Paddle2.Dy = -1
 		}
 		if direction == "down" {
-			game.Paddle2.Y += PADDLE_SPEED
+			game.Paddle2.Dy = 1
 		}
 
-		if game.Paddle2.Y < 0 {
-			game.Paddle2.Y = 0
-		}
-		if game.Paddle2.Y > GAME_HEIGHT-game.Paddle2.Height {
-			game.Paddle2.Y = GAME_HEIGHT - game.Paddle2.Height
-		}
 	}
 }
 
@@ -222,7 +212,6 @@ func manager() {
 			if len(clients) != 2 {
 				stopCurrentGame()
 			}
-			// 🔥 CRITICAL FIX
 
 			broadcastToAll([]byte("player disconnected"))
 
@@ -269,6 +258,18 @@ func Ballcreation() Ball {
 func updateball(gameball *Ball) {
 	gameball.X += gameball.Dx * gameball.Speed
 	gameball.Y += gameball.Dy * gameball.Speed
+}
+func updatepaddle(paddle *Paddlemovement) {
+	if paddle.Dy == 0 {
+		return
+	}
+	paddle.Y += paddle.Dy * PADDLE_SPEED
+	if paddle.Y < 0 {
+		paddle.Dy = 0
+	}
+	if paddle.Y > GAME_HEIGHT-paddle.Height {
+		paddle.Dy = 0
+	}
 }
 func collisionwithwall(state *Gamestate) {
 	// top wall
@@ -341,6 +342,8 @@ func Mainlogic(state *Gamestate, stop <-chan struct{}) {
 				return
 			}
 			updateball(&state.Ball)
+			updatepaddle(&state.Paddle1)
+			updatepaddle(&state.Paddle2)
 			collisionwithwall(state)
 			collisionwithpaddle(state)
 			gameMu.Unlock()
