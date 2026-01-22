@@ -18,7 +18,7 @@ const GAME_HEIGHT = 500
 const PADDLE_WIDTH = 25
 const PADDLE_HEIGHT = 100
 const BALL_RADIUS = 12
-const PADDLE_SPEED = 2
+const PADDLE_SPEED = 8
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
